@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd" >
+<plist version="1.0">
+  <dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.plexapp.plugins.hrti</string>
+    <key>PlexClientPlatforms</key>
+    <string>*</string>
+    <key>PlexFrameworkVersion</key>
+    <string>2</string>
+    <key>PlexPluginRegions</key>
+    <array>
+      <string>HR</string>
+      <string>DE</string>
+    </array>
+    <key>PlexURLServices</key>
+    <dict>
+      <key>HRT</key>
+      <dict>
+        <key>URLPattern</key>
+        <string>https://clientapi.hrt.hr/.*</string>
+        <key>Identifier</key>
+        <string>com.plexapp.plugins.hrti</string>
+      </dict>
+    </dict>
+  </dict>
+</plist>
