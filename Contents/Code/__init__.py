@@ -65,4 +65,7 @@ def MainMenu():
 
 def SecondMenu():
 	oc = ObjectContainer()
+	
+	Log.Info('dummy VCS test')
+	
 	return oc
