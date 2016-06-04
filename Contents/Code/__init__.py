@@ -89,7 +89,7 @@ def parse_session(request):
 	return response[ 'session_id' ]
 
 def login():
-	
+	return
 
 def debug(d):
 	try:
