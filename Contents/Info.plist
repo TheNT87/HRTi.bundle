@@ -12,13 +12,14 @@
     <array>
       <string>HR</string>
       <string>DE</string>
+      <string>CH</string>
     </array>
     <key>PlexURLServices</key>
     <dict>
       <key>HRT</key>
       <dict>
         <key>URLPattern</key>
-        <string>https://clientapi.hrt.hr/.*</string>
+        <string>https://.*\.hrt\.hr/.*</string>
         <key>Identifier</key>
         <string>com.plexapp.plugins.hrti</string>
       </dict>

@@ -1,18 +1,18 @@
 #Copyright NT 2016
 
 def MetadataObjectForURL(url):
-	Log.Info("getting metadata for url: %s",url)
-	metadata = VideoClipObject()
+	Log("getting metadata for url: %s",url)
+	metadata = VideoClipObject(title='title')
 	
 	return metadata
 
 def MediaObjectsForURL(url):
-	Log.Info("getting mediaobject for url: %s",url)
+	Log("getting mediaobject for url: %s",url)
 	mediaobject = MediaObject()
 	
 	return mediaobject
 
 def NormalizeURL(url):
-	Log.Info("normalize url: %s",url)
+	Log("normalize url: %s",url)
 	
 	return url
