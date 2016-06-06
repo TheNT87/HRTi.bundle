@@ -47,13 +47,13 @@ def MainMenu():
 	oc = ObjectContainer(
 		objects = [
 			DirectoryObject(key = Callback(VideoOnDemand), title = L('vod') )
-		]
+		], no_cache = True
 	)
 	return oc
 	
 @route("video/hrti/vod")
 def VideoOnDemand():
-	oc = ObjectContainer()
+	oc = ObjectContainer( no_cache = True)
 	session_data = Data.LoadObject( SESSION_DATA_KEY )
 	
 	try:
@@ -100,10 +100,11 @@ def login(session_id):
 def debug(d):
 	try:
 		for k,v in d.items():
-			if key == 'modules':
+			if k == 'modules':
 				for km,vm in v.items():
 					Log.Info("%s: %s",km,vm)
-			Log.Info("%s: %s",km,vm)
+			else:
+				Log.Info("%s: %s",k,v)
 	except Exception:
 		Log.Info("%s", inspect.getmembers( d ) )
 	
