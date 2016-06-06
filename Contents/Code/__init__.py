@@ -8,9 +8,12 @@ LOGIN_URL = 'https://clientapi.hrt.hr/user/login/session_id/%s/format/json'
 CLIENT_HOST = 'clientapi.hrt.hr'
 SESSION_DATA_KEY = 'session_response'
 LOGIN_DATA_KEY = 'login'
+SECURE_STREAMING_TOKEN_KEY = 'secure_streaming_token'
+
+DEBUG_RANDOM = Util.RandomInt( 0,67 )
 
 def Start():
-	HTTP.ClearCache()
+	Log.Info( "starting plug-in" )
 	ObjectContainer.title1 = TITLE
 	DirectoryObject.thumb = R(ICON)
 	if( Prefs['username'] == None or Prefs['password'] == None):
@@ -28,26 +31,38 @@ def Start():
 		)
 		login_request.load()
 		Data.SaveObject(LOGIN_DATA_KEY,JSON.ObjectFromString(login_request.content))
-		Log.Info( Data.LoadObject(LOGIN_DATA_KEY) )
-	Plugin.AddViewGroup("vod", viewMode='List', mediaType='items')
+	login_data = Data.LoadObject( LOGIN_DATA_KEY )
+	access_token = login_data[ SECURE_STREAMING_TOKEN_KEY ]
+	expires = Datetime.FromTimestamp( float(access_token.split('/')[2]))
+	Log.Info(access_token)
+	if( expires < Datetime.Now() ):
+		Log.Info('login has expired')
+		debug( Data.LoadObject( SESSION_DATA_KEY ) )
 	
-@handler('/video/hrti-%s' % Util.RandomInt(0,100), TITLE, thumb = ICON)
+	Plugin.AddViewGroup("vod", viewMode='List', mediaType='items')
+	Log.Debug( "parsed start" )
+	
+@handler('/video/hrti', TITLE, thumb = ICON)
 def MainMenu():
-	#~ session_data = Data.LoadObject(SESSION_DATA_KEY)
-	#~ 
 	oc = ObjectContainer(
 		objects = [
 			DirectoryObject(key = Callback(VideoOnDemand), title = L('vod') )
 		]
 	)
-	#~ for (k,v) in session_data['modules'].items():
-		#~ oc.add(DirectoryObject( key = Callback(SecondMenu,value=v), title = k ))
-		#~ 
 	return oc
 	
 @route("video/hrti/vod")
 def VideoOnDemand():
 	oc = ObjectContainer()
+	session_data = Data.LoadObject( SESSION_DATA_KEY )
+	
+	try:
+		uri = Data.LoadObject( SESSION_DATA_KEY )['modules']['program_category']['uri']
+		programm_list = XML.ElementFromURL( uri)
+		for programm_category in programm_list.xpath( '//epg_program_category' ):
+			oc.add( DirectoryObject( title = XML.StringFromElement( programm_category ) ) )
+	except Exception as e:
+		Log.Error('chaugth e')
 	return oc
 
 IDENTIFY_URL = 'https://clientapi.hrt.hr/client_api.php/config/identify/format/json'
@@ -73,8 +88,8 @@ def parse_session(request):
 	Log.Debug("got session response: %s", response_content )
 	try:
 		Data.SaveObject(LANGUAGE_SOURCE_KEY, XML.ElementFromURL( response[LANGUAGE_SOURCE_KEY] ) )
-	except:
-		Log.Error('language_source not found')
+	except Exception as e:
+		Log.Exception('chaugth e')
 	Dict[ MODULES_KEY ] = response[ MODULES_KEY ]
 	Dict[ APPLICATION_ID_KEY ] = response[ APPLICATION_ID_KEY ]
 	return response[ 'session_id' ]
@@ -85,7 +100,10 @@ def login(session_id):
 def debug(d):
 	try:
 		for k,v in d.items():
-			Log.Info("%s: %s",k,v)
+			if key == 'modules':
+				for km,vm in v.items():
+					Log.Info("%s: %s",km,vm)
+			Log.Info("%s: %s",km,vm)
 	except Exception:
 		Log.Info("%s", inspect.getmembers( d ) )
 	
