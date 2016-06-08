@@ -45,25 +45,25 @@ def MainMenu():
 	
 @route('video/hrti/listings')
 def VideoListings():
-	oc = ObjectContainer(no_cache = True, title2='videos')
-	for video in JSON.ObjectFromURL( Dict['vsc'], timeout=float(30) )['videos']:
+	oc = ObjectContainer(title2='videos')
+	for video in JSON.ObjectFromURL( Dict['vsc'], timeout=float(60) )['videos']:
 		oc.add( DirectoryObject(
-			key= Callback(VideoListing,id=video['id'],value=video),
+			key= Callback( VideoListing,id=video['id'], url=video['url']),
 			title = video['title']['title_long'],
 			summary = video['title']['summary_short'],
-			#originally_available_at = Datetime.ParseDate( video['properties']['broadcast_date'] ).date(),
 			#url = video['url'].format( vsc = Dict['vsc'] )
 		))
 	return oc
 	
-@route('video/hrti/listings/{id}',method='PUT')
-def VideoListing(id,value):
+@route('video/hrti/listings/{id}')
+def VideoListing(id,url):
 	Log.Debug('entering videolisting')
-	oc = ObjectContainer(title2=id, no_cache = True)
-	oc.add(VideoClipObject(
-		title = value['title']['title_long'],summary='',
-		url=value['url'].format(vsc=Dict['vsc'])
-		#url="http://stafaband.info-muviza.com-bursamp3.wapka.mobi-sharelagu.wapka.mobi-4shared.com.laguzone.com/download_lagu_video_Bugs%20Bunny's%20Square%20Dance%20In%20'Hillbilly%20Hare'%20(best%20Quality%20+%20Subtitles!).mp4?v=NkiJDw1Kung"
+	fetch = JSON.ObjectFromURL( url.format( vsc = Dict['vsc'] ) )['video'][0]
+	oc = ObjectContainer(title2=id)
+	oc.add(  CreateVideoClipObject( id = id,resolutions = [ 720 ],
+			title = fetch['title']['title_medium'],summary=fetch['title']['summary_medium'],
+			url=fetch['video_assets']['movie'][0]['url'].format( TOKEN = Dict['secure_streaming_token'] ),
+			originally_available_at = fetch['properties']['broadcast_date']
 		)
 	)
 		
@@ -139,6 +139,7 @@ def login():
 	if( Data.Exists( KEY ) ):
 		data = Data.LoadObject( KEY )
 		access_token = data[ 'secure_streaming_token' ]
+		Log( access_token )
 		expires = Datetime.FromTimestamp( float(access_token.split('/')[2]) )
 		if( expires > Datetime.Now() ):
 			Log('session still valid')
@@ -196,4 +197,74 @@ def debug(d, indent=0):
 			debug(value, indent+1)
 		else:
 			Log( '\t' * (indent+1) + str(value) )
-	
+
+
+####################################################################################################
+@route("video/hrti/create")
+def CreateVideoClipObject(id=None, url=None, title=None, summary=None, thumb='', originally_available_at=None, resolutions=[], include_container=False):
+
+	videoclip_obj = VideoClipObject(
+		key = Callback(CreateVideoClipObject,
+		 id=id, url=url, title=title, summary=summary, thumb=thumb,
+		 originally_available_at=originally_available_at, resolutions=resolutions, include_container=True),
+		rating_key = url if url else id,
+		title = title,
+		summary = summary,
+		thumb = Resource.ContentsOfURLWithFallback(url=thumb, fallback=ICON),
+		originally_available_at = Datetime.ParseDate(originally_available_at)
+	)
+
+	if url:
+		items = [
+			MediaObject(
+				parts = [
+					PartObject( key= HTTPLiveStreamURL(Callback(PlayVideo, id=id,url=url,res=res) ))
+				],
+				video_resolution = res,
+				audio_channels = 2,
+				optimized_for_streaming = True,
+				container = 'mpegts',
+				video_codec = VideoCodec.H264,
+				audio_codec = AudioCodec.AAC,
+			) for res in resolutions
+		]
+	else:
+		items = [
+			MediaObject(
+				parts = [
+					PartObject(key=HTTPLiveStreamURL(Callback(PlayVideo, id=id, res=res)))
+				],
+				video_resolution = res,
+				audio_channels = 2,
+				optimized_for_streaming = True
+			) for res in resolutions
+		]
+
+	videoclip_obj.items = items
+
+	if include_container:
+		return ObjectContainer(objects=[videoclip_obj])
+	else:
+		return videoclip_obj
+
+####################################################################################################
+@indirect
+def PlayVideo(url):
+
+	#~ json_obj = JSON.ObjectFromURL(FEATURED_ARTICLES)
+#~ 
+	#~ for article in json_obj:
+#~ 
+		#~ article = article['article']
+#~ 
+		#~ if article['id'] == id:
+#~ 
+#~ #			if res == '1080' and 'video_url' in article:
+#~ #				video_url = '%s/playlist.m3u8' % article['link_hd']
+#~ #			else:
+#~ #				video_url = '%s/playlist.m3u8' % article['link_sd']
+#~ 
+			#~ video_url = '%s/playlist.m3u8' % article['link_hd']
+	return IndirectResponse(VideoClipObject, key=url)
+
+	raise Ex.MediaNotAvailable
