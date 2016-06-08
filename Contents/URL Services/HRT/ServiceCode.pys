@@ -1,5 +1,10 @@
 #Copyright NT 2016
 
+def NormalizeURL(url):
+	Log("normalize url in standart folder: %s",url)
+	
+	return url
+
 def MetadataObjectForURL(url):
 	Log("getting metadata for url: %s",url)
 	metadata = VideoClipObject(title='title')
@@ -10,9 +15,19 @@ def MediaObjectsForURL(url):
 	Log("getting mediaobject for url: %s",url)
 	mediaobject = MediaObject()
 	
-	return mediaobject
+	return [
+		MediaObject(
+			audio_codec = AudioCodec.AAC,
+			video_codec = VideoCodec.H264,
+			container = 'mp4',
+			video_resolution = 'sd',
+			optimized_for_streaming = True,
+			audio_channels = 2,
+			parts = [PartObject(key=Callback(PlayVideo, url=url))]
+		)
+	]
 
-def NormalizeURL(url):
-	Log("normalize url: %s",url)
-	
-	return url
+@indirect
+def PlayVideo(url):
+	Log(url)
+	return IndirectResponse(VideoClipObject, key=url)

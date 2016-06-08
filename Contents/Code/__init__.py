@@ -5,59 +5,97 @@ TITLE = 'HRTi Plex'
 ICON = 'icon-default.png'
 URL = 'https://hrti.hrt.hr/'
 CLIENT_HOST = 'clientapi.hrt.hr'
-LOGIN_DATA_KEY = 'login'
 
 DEBUG_RANDOM = Util.RandomInt( 0,67 )
 
 def Start():
 	Log( "starting plug-in" )
-	ObjectContainer.title1 = TITLE
-	DirectoryObject.thumb = R(ICON)
+	HTTP.CacheTime = 0
 	if( Prefs['username'] == None or Prefs['password'] == None):
 		raise ValueError('username and password required')
-	#~ if(not Data.Exists( LOGIN_DATA_KEY ) ):
-		#~ request = {"application_publication_id": "all_in_one"}
-		#~ request['uuid'] = identify( request )
-		#~ request.update({ "application_version":"1.1",
-			#~ "device_model_string_id":Platform.MachineIdentifier,
-			#~ "os":Platform.OS, "os_version":Platform.OSVersion, # evtl. Platform.CPU
-			#~ "screen_height":"1080", "screen_width":"1920"
-		#~ })
-		#~ login_request = HTTP.Request( LOGIN_URL % parse_session( request ),
-			#~ headers = REQUEST_HEADERS, data = '{"username":"%(username)s","password":"%(password)s"}' % Prefs
-		#~ )
-		#~ login_request.load()
-		#~ Data.SaveObject(LOGIN_DATA_KEY,JSON.ObjectFromString(login_request.content))
-	Log("%s",login())
-	login_data = Data.LoadObject( LOGIN_DATA_KEY )
-	access_token = login_data[ SECURE_STREAMING_TOKEN_KEY ]
-	expires = Datetime.FromTimestamp( float(access_token.split('/')[2]))
-	Log.Info(access_token)
-	if( expires < Datetime.Now() ):
-		Log.Info('login has expired')
-		session_data = Data.LoadObject( SESSION_DATA_KEY )
-		Log.Debug("modules: %s", session_data["modules"].items() )
-		Log.Debug("session data: %s", session_data.items() )
-		Log.Debug("login data: %s", login_data.items() )
-		for k,v in login_data['services'].items():
-			if bool(v) :
-				modules = session_data['modules']
-				if k in modules:
-					Log.Debug("module {0}: %s",k,modules[k].items())
-		#debug(modules)
+	session = Data.LoadObject('session')
+	auth = login()
+	Dict['access_token'] =  Hash.SHA1( Dict['uuid'] + auth['session_token'] )
+	Dict['language'] = auth['application_language']
+	Dict['application_id'] = 'all_in_one'
+	Dict['vsc'] = session['variables']['vsc']['uri'].format(language='hr',application_id='all_in_one')
 	
-		
-	Plugin.AddViewGroup("vod", viewMode='List', mediaType='items')
+	Plugin.AddViewGroup("Details", viewMode="InfoList", mediaType="items")
+	Plugin.AddViewGroup("List", viewMode="List", mediaType="items")
 	Log.Debug( "parsed start" )
+
+ObjectContainer.title1 = TITLE
+ObjectContainer.view_group = 'List'
+#######
+DirectoryObject.thumb = R(ICON)
+VideoClipObject.thumb = R(ICON)
 	
 @handler('/video/hrti', TITLE, thumb = ICON)
 def MainMenu():
+	Log( "entering MainMenu" )
 	oc = ObjectContainer( header = 'loading', message='please wait ..',
 		objects = [
-			DirectoryObject(key = Callback(VideoOnDemand), title = L('vod') ),
-			DirectoryObject(key = Callback(EPG), title = 'epg')
-		], no_cache = True
+			#~ DirectoryObject(key = Callback(VideoOnDemand), title = L('vod') ),
+			#~ DirectoryObject(key = Callback(EPG), title = 'epg'),
+			#DirectoryObject(key = Callback(Catchup), title = 'catchup')
+			DirectoryObject(key = Callback(VideoListings), title = 'video_listings')
+		]
 	)
+	return oc
+	
+@route('video/hrti/listings')
+def VideoListings():
+	oc = ObjectContainer(no_cache = True, title2='videos')
+	for video in JSON.ObjectFromURL( Dict['vsc'], timeout=float(30) )['videos']:
+		oc.add( DirectoryObject(
+			key= Callback(VideoListing,id=video['id'],value=video),
+			title = video['title']['title_long'],
+			summary = video['title']['summary_short'],
+			#originally_available_at = Datetime.ParseDate( video['properties']['broadcast_date'] ).date(),
+			#url = video['url'].format( vsc = Dict['vsc'] )
+		))
+	return oc
+	
+@route('video/hrti/listings/{id}',method='PUT')
+def VideoListing(id,value):
+	Log.Debug('entering videolisting')
+	oc = ObjectContainer(title2=id, no_cache = True)
+	oc.add(VideoClipObject(
+		title = value['title']['title_long'],summary='',
+		url=value['url'].format(vsc=Dict['vsc'])
+		#url="http://stafaband.info-muviza.com-bursamp3.wapka.mobi-sharelagu.wapka.mobi-4shared.com.laguzone.com/download_lagu_video_Bugs%20Bunny's%20Square%20Dance%20In%20'Hillbilly%20Hare'%20(best%20Quality%20+%20Subtitles!).mp4?v=NkiJDw1Kung"
+		)
+	)
+		
+	return oc
+	
+
+@route("video/hrti/catchup")
+def Catchup():
+	Log.Debug( 'entering catchup' )
+	try:
+		session = Data.LoadObject( 'session' )
+		uri = session['modules']['catchup']['resources']['list']['uri']
+		response = XML.ElementFromURL( uri.format(session_id=session['session_id'],access_token=Dict['access_token']), timeout = float(30) )
+		oc = ObjectContainer( title2='catchup' )
+		Log.Debug( 'parsing catchup' )
+		for catchup in response.xpath('//catchup'):
+			Log(XML.StringFromElement(catchup))
+			stop = Datetime.ParseDate( catchup.xpath( '@stop/text()')[0] )
+			Log("%s",stop)
+			if( stop > Datetime.Now() ):
+				Log( catchup.xpath( 'title/text()' )[0] )
+			#~ oc.add( VideoClipObject(
+				#~ url = catchup.xpath( 'streaming_url/text()' )[0].split('?')[0],
+				#~ title = catchup.xpath( 'title/text()' )[0],
+				#~ summary = catchup.xpath( 'description/text()' )[0],
+				#~ #originally_available_at = Datetime.ParseDate( catchup.xpath( '@start/text()')[0] ).date(),
+				#~ #duration = Datetime.ParseDate( catchup.xpath( '@stop')[0] ).date()
+				#~ #							- Datetime.ParseDate( catchup.xpath( '@start')[0] ).date()
+			#~ ))
+	except:
+		Log.Error("error")
+	Log.Debug( 'exiting' )
 	return oc
 	
 @route("video/hrti/vod")
@@ -103,60 +141,59 @@ def login():
 		access_token = data[ 'secure_streaming_token' ]
 		expires = Datetime.FromTimestamp( float(access_token.split('/')[2]) )
 		if( expires > Datetime.Now() ):
+			Log('session still valid')
 			return data
-		URL = 'https://clientapi.hrt.hr/user/login/session_id/%(session_id)s/format/json'
-		login_request = HTTP.Request( URL % parse_session( identify() ),
-			headers = REQUEST_HEADERS, data = '{"username":"%(username)s","password":"%(password)s"}' % Prefs
-		)
-		login_request.load()
-		Data.SaveObject(LOGIN_DATA_KEY,JSON.ObjectFromString(login_request.content))
-	return Data.LoadObject( KEY )
-	
-
+	URL = 'https://clientapi.hrt.hr/user/login/session_id/%(session_id)s/format/json'
+	request = HTTP.Request( URL % session(),
+		headers = REQUEST_HEADERS, data = '{"username":"%(username)s","password":"%(password)s"}' % Prefs
+	)
+	request.load()
+	response = JSON.ObjectFromString(request.content)
+	Data.SaveObject(KEY,response)
+	return response
 	
 MODULES_KEY = 'modules'
 APPLICATION_ID_KEY = 'application_id'
 LANGUAGE_SOURCE_KEY = 'language_source'
+IDENTIFY_URL = 'https://clientapi.hrt.hr/client_api.php/config/identify/format/json'
 
-def session(request):
+def session():
+	Log.Debug('entering session')
 	KEY = 'session'
-	request.update({ "application_version":"1.1",
+	data = identify()
+	data.update({ "application_version":"1.1",
 		"device_model_string_id":Platform.MachineIdentifier,
 		"os":Platform.OS, "os_version":Platform.OSVersion, # evtl. Platform.CPU
 		"screen_height":"1080", "screen_width":"1920"
 	})
-	request = HTTP.Request( IDENTIFY_URL, headers=REQUEST_HEADERS, method='PUT',
-		data = JSON.StringFromObject( request )
+	session = HTTP.Request( IDENTIFY_URL, headers=REQUEST_HEADERS, method='PUT',
+		data = JSON.StringFromObject( data )
 	)
-	request.load()
-	Data.SaveObject(KEY, JSON.ObjectFromString( request.content ) )
-	#~ try:
-		#~ Data.SaveObject(LANGUAGE_SOURCE_KEY, XML.ElementFromURL( response[LANGUAGE_SOURCE_KEY] ) )
-	#~ except Exception as e:
-		#~ Log.Exception('chaugth %s on saving language_source',e)
-	#~ Dict[ MODULES_KEY ] = response[ MODULES_KEY ]
-	#~ Dict[ APPLICATION_ID_KEY ] = response[ APPLICATION_ID_KEY ]
-	return Data.LoadObject( KEY )
+	session.load()
+	response = JSON.ObjectFromString( session.content )
+	Dict['session_id'] = response['session_id']
+	Dict['uuid'] = data['uuid']
+	Data.SaveObject(KEY, response )
+	Log.Debug('exiting')
+	return response
 
-IDENTIFY_URL = 'https://clientapi.hrt.hr/client_api.php/config/identify/format/json'
 REQUEST_HEADERS = {'Content-Type': 'application/json'}
 
 def identify():
+	Log.Debug('entering identify')
 	request = {"application_publication_id": "all_in_one"}
 	HTTP.Request( IDENTIFY_URL, method='OPTIONS' ).load()
 	identity = HTTP.Request( IDENTIFY_URL, headers=REQUEST_HEADERS, data=JSON.StringFromObject(request) )
 	identity.load()
 	request['uuid'] = JSON.ObjectFromString( identity.content )['uuid']
+	Log.Debug('exiting')
 	return request
 
-def debug(d):
-	try:
-		for k,v in d.items():
-			if k == 'modules':
-				for km,vm in v.items():
-					Log.Info("%s: %s",km,vm)
-			else:
-				Log.Info("%s: %s",k,v)
-	except Exception:
-		Log.Info("%s", inspect.getmembers( d ) )
+def debug(d, indent=0):
+ for key, value in d.iteritems():
+		Log( '\t' * indent + str(key) )
+		if isinstance(value, dict):
+			debug(value, indent+1)
+		else:
+			Log( '\t' * (indent+1) + str(value) )
 	

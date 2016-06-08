@@ -14,15 +14,29 @@
       <string>DE</string>
       <string>CH</string>
     </array>
+    <key>PlexAudioCodec</key>
+    <array>
+      <string>AAC</string>
+    </array>
+    <key>PlexMediaContainer</key>
+    <array>
+      <string>M4V</string>
+    </array>
+    <key>PlexVideoCodec</key>
+    <array>
+      <string>H.264</string>
+    </array>
     <key>PlexURLServices</key>
     <dict>
       <key>HRT</key>
       <dict>
         <key>URLPattern</key>
-        <string>https://.*\.hrt\.hr/.*</string>
+        <string>https://hrti-static\.hrt\.hr/</string>
         <key>Identifier</key>
         <string>com.plexapp.plugins.hrti</string>
       </dict>
     </dict>
+    <key>PlexPluginDevMode</key>
+    <string>1</string>
   </dict>
 </plist>
