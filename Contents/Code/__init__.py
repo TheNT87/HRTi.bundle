@@ -59,15 +59,15 @@ def VideoListings():
 def VideoListing(id,url):
 	Log.Debug('entering videolisting')
 	fetch = JSON.ObjectFromURL( url.format( vsc = Dict['vsc'] ) )['video'][0]
-	oc = ObjectContainer(title2=id)
-	oc.add(  CreateVideoClipObject( id = id,resolutions = [ 720 ],
+	#oc = ObjectContainer(title2=id)
+	return  CreateVideoClipObject( id = id,resolutions = [ 720 ],
 			title = fetch['title']['title_medium'],summary=fetch['title']['summary_medium'],
-			url=fetch['video_assets']['movie'][0]['url'].format( TOKEN = Dict['secure_streaming_token'] ),
-			originally_available_at = fetch['properties']['broadcast_date']
-		)
+			url=fetch['video_assets']['movie'][0]['url'].format( TOKEN = login()['secure_streaming_token'] ),
+			originally_available_at = fetch['properties']['broadcast_date'], include_container=True
+		#)
 	)
 		
-	return oc
+	#return oc
 	
 
 @route("video/hrti/catchup")
@@ -200,7 +200,7 @@ def debug(d, indent=0):
 
 
 ####################################################################################################
-@route("video/hrti/create")
+@route("video/hrti/create/{id}",method='PUT')
 def CreateVideoClipObject(id=None, url=None, title=None, summary=None, thumb='', originally_available_at=None, resolutions=[], include_container=False):
 
 	videoclip_obj = VideoClipObject(
@@ -218,12 +218,12 @@ def CreateVideoClipObject(id=None, url=None, title=None, summary=None, thumb='',
 		items = [
 			MediaObject(
 				parts = [
-					PartObject( key= HTTPLiveStreamURL(Callback(PlayVideo, id=id,url=url,res=res) ))
+					PartObject( key = HTTPLiveStreamURL( url ))
 				],
 				video_resolution = res,
 				audio_channels = 2,
 				optimized_for_streaming = True,
-				container = 'mpegts',
+				container = 'mp4',
 				video_codec = VideoCodec.H264,
 				audio_codec = AudioCodec.AAC,
 			) for res in resolutions
