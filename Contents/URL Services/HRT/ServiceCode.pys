@@ -1,0 +1,47 @@
+#Copyright NT 2016
+
+store = {}
+
+def NormalizeURL(url):
+	Log("normalize url in standart folder: %s",url)
+	#video_listings = JSON.ObjectFromURL( url, timeout=float(30) )
+	
+	return url # video_listings['video'][0]['video_assets']['movie'][0]['url']
+
+def MetadataObjectForURL(url):
+	Log("getting metadata for url: %s",url)
+	
+	video_listings = JSON.ObjectFromURL( url, timeout=float(30) )
+	store['video'] = video_listings['video'][0]
+	
+	return VideoClipObject(
+		title='title'
+		#originally_available_at = Datetime.ParseDate( Dict['video']['properties']['broadcast_date'] ).date()
+	)
+
+def MediaObjectsForURL(url):
+	Log("getting mediaobject for url: %s",url)
+	return [
+		MediaObject(
+			protocols = [ 'hls' ],
+			container='mpegts',
+			video_codec=VideoCodec.H264,
+			audio_codec=AudioCodec.AAC,
+			audio_channels=2,
+			optimized_for_streaming=True,
+			#parts = [ PartObject(key = HTTPLiveStreamURL(url)) ]
+			parts = [ PartObject( key= Callback( PlayVideo,url=url,ext='m3u8') ) ],
+			duration = 3128
+		)
+	]
+
+@indirect
+def PlayVideo(url, **kwargs):
+	Log('play video %s', url )
+	video_listings = JSON.ObjectFromURL( url, timeout=float(60) )
+	return IndirectResponse(VideoClipObject,
+		key = HTTPLiveStreamURL( video_listings['video'][0]['video_assets']['movie'][0]['url'].format(
+			TOKEN = 'lCUwGB0DAjuBVj3777AX3w/token_expiration/1465463133'
+			)
+		)
+	)
